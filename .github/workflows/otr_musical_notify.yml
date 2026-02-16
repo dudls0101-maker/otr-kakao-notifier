@@ -1,4 +1,5 @@
 name: OTR Musical Audition Notifier
+# Runs every 5 minutes to check for new musical auditions
 
 on:
   schedule:
