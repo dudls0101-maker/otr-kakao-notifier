@@ -52,6 +52,8 @@ python tools/get_kakao_refresh_token.py
 ## 4) GitHub Actions 실행 확인
 - Actions 탭에서 워크플로가 매시간 실행됩니다.
 - 처음 실행 시에는 `state.json`만 갱신되고(또는 신규 글이 있으면 알림) 이후부터는 새 글만 감지합니다.
+- Actions 실행 목록에서 이벤트 필터가 `event:workflow_dispatch`로 걸려 있으면 스케줄 실행(`event:schedule`)이 보이지 않습니다. 필터를 지우고 확인하세요.
+- Event 드롭다운에서 `workflow_dispatch`가 선택된 상태여도 수동 실행만 보입니다. 드롭다운 우측 `X`로 필터를 해제하세요.
 
 ## 주의
 - Kakao 토큰/키는 **절대 커밋하지 말고** GitHub Secrets로만 관리하세요.
