@@ -89,10 +89,23 @@ def main() -> None:
     posts = fetch_posts()
     new_posts, max_vid = detect_new_posts(posts, last_vid=last_vid)
 
-    for p in new_posts:
-        if "뮤지컬" in p.title:
-            text = f"[OTR 오디션] {p.title}\n{p.url}"
-            send_message_using_env(text=text, url=p.url)
+    print(f"last_vid={last_vid} fetched={len(posts)} new_posts={len(new_posts)}")
+
+    if os.environ.get("KAKAO_TEST_MESSAGE") == "1":
+        send_message_using_env(text="[OTR 오디션] 테스트 메시지", url=AUDITION_URL)
+
+    musical_posts = [p for p in new_posts if "뮤지컬" in p.title]
+    print(f"musical_matches={len(musical_posts)}")
+
+    if musical_posts:
+        lines = [f"[OTR 오디션] 뮤지컬 신규 {len(musical_posts)}건"]
+        for p in musical_posts:
+            lines.append(f"- {p.title}")
+            lines.append(p.url)
+        text = "\n".join(lines)
+        if len(text) > 900:
+            text = text[:900] + "\n(이하 생략)"
+        send_message_using_env(text=text, url=musical_posts[-1].url)
 
     if max_vid != last_vid:
         state["last_vid"] = max_vid
