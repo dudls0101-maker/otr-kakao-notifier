@@ -11,7 +11,7 @@ from .kakao_api import send_message_using_env
 
 
 AUDITION_URL = "https://otr.co.kr/audition/"
-VID_RE = re.compile(r"[?&]vid=(\d+)")
+VID_RE = re.compile(r"(?:[?&]|&amp;)vid=(\d+)")
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,19 @@ def save_state(path: str, state: dict) -> None:
 
 
 def fetch_posts(timeout_seconds: int = 20) -> List[Post]:
-    resp = requests.get(AUDITION_URL, timeout=timeout_seconds)
+    resp = requests.get(
+        AUDITION_URL,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/122.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.7,en;q=0.6",
+        },
+        timeout=timeout_seconds,
+    )
     resp.raise_for_status()
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -58,6 +70,12 @@ def fetch_posts(timeout_seconds: int = 20) -> List[Post]:
         if url.startswith("/"):
             url = "https://otr.co.kr" + url
         posts.append(Post(vid=vid, title=title, url=url))
+
+    if not posts:
+        snippet = resp.text
+        snippet = snippet.replace("\r", " ").replace("\n", " ")
+        snippet = snippet[:400]
+        print(f"No posts parsed. status={resp.status_code} url={resp.url} snippet={snippet}")
 
     unique = {(p.vid, p.title): p for p in posts}
     posts = list(unique.values())
