@@ -2,7 +2,7 @@ name: OTR Musical Audition Notifier
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
