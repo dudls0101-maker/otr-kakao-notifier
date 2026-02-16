@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from .kakao_api import send_message_using_env
 
 
-AUDITION_URL = "https://otr.co.kr/audition/"
+AUDITION_URL = "https://otr.co.kr/audition/?mode=list"
 VID_RE = re.compile(r"(?:[?&]|&amp;)vid=(\d+)")
 
 
