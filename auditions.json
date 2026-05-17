@@ -1,7 +1,43 @@
 {
-  "updated_at": "2026-05-17T12:12:12+00:00",
-  "count": 0,
+  "updated_at": "2026-05-17T12:53:52+00:00",
+  "count": 5,
   "keyword": "뮤지컬",
   "source": "https://otr.co.kr/audition/?mode=list",
-  "auditions": []
+  "auditions": [
+    {
+      "vid": 20953,
+      "title": "[뮤지컬]★ 키즈뮤지컬 <헬로카봇> 시즌10 배우 성인 남자 배역 추가 모집 (~5/22)",
+      "url": "https://otr.co.kr/audition/?vid=20953",
+      "first_seen_at": "2026-05-17T12:53:52+00:00",
+      "last_seen_at": "2026-05-17T12:53:52+00:00"
+    },
+    {
+      "vid": 20952,
+      "title": "[뮤지컬]\"우리나라에 악기 다루는 배우 없나요\" 창작 뮤지컬 <언튜닝> 주인공 모집",
+      "url": "https://otr.co.kr/audition/?vid=20952",
+      "first_seen_at": "2026-05-17T12:53:52+00:00",
+      "last_seen_at": "2026-05-17T12:53:52+00:00"
+    },
+    {
+      "vid": 20939,
+      "title": "[뮤지컬][더 맨 얼라이브 초이스] 무대크루 구인",
+      "url": "https://otr.co.kr/audition/?vid=20939",
+      "first_seen_at": "2026-05-17T12:53:52+00:00",
+      "last_seen_at": "2026-05-17T12:53:52+00:00"
+    },
+    {
+      "vid": 20938,
+      "title": "[뮤지컬][더 맨 얼라이브 초이스] 배우 구인",
+      "url": "https://otr.co.kr/audition/?vid=20938",
+      "first_seen_at": "2026-05-17T12:53:52+00:00",
+      "last_seen_at": "2026-05-17T12:53:52+00:00"
+    },
+    {
+      "vid": 20794,
+      "title": "[뮤지컬]★2026 '뮤지컬 윈디시티' 전배역 모집★",
+      "url": "https://otr.co.kr/audition/?vid=20794",
+      "first_seen_at": "2026-05-17T12:53:52+00:00",
+      "last_seen_at": "2026-05-17T12:53:52+00:00"
+    }
+  ]
 }
