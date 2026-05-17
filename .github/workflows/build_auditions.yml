@@ -1,0 +1,59 @@
+name: Build Auditions JSON
+
+# OTR 오디션 사이트를 30분마다 긁어 auditions.json 을 갱신/커밋한다.
+# iOS 앱은 이 JSON 을 fetch 해서 화면에 띄운다.
+
+on:
+  schedule:
+    # 매 30분마다. GitHub schedule cron 은 보통 몇 분 지연될 수 있다.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 동시에 두 번 돌면서 같은 파일에 push 하는 경합 방지
+concurrency:
+  group: build-auditions
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-v1
+
+      - name: Install Playwright Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: python -m playwright install chromium
+
+      - name: Scrape OTR and build auditions.json
+        run: python -m src.build_auditions
+
+      - name: Commit auditions.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add auditions.json
+          if git diff --cached --quiet; then
+            echo "No changes to auditions.json"
+            exit 0
+          fi
+          git commit -m "chore: update auditions.json"
+          git push
