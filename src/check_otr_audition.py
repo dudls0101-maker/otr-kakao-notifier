@@ -1,12 +1,17 @@
 """OTR 오디션 목록 크롤링 라이브러리.
 
 `fetch_posts()` 를 호출하면 OTR 오디션 게시판의 글 목록을 가져온다.
-사이트가 봇 차단(cupid.js)을 띄우는 경우 자동으로 Playwright(Chromium)로 폴백한다.
+
+OTR 은 GitHub Actions 데이터센터 IP 를 봇으로 차단(cupid.js → 403)하므로,
+환경변수 `ZENROWS_API_KEY` 가 있으면 ZenRows 프록시(한국 IP + JS 렌더링)로
+우회한다. 키가 없으면 기존 requests / Playwright 경로로 시도(로컬 개발용).
 """
 
+import os
 import re
 from dataclasses import dataclass
 from typing import List
+from urllib.parse import urlencode
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,6 +19,8 @@ from bs4 import BeautifulSoup
 
 AUDITION_URL = "https://otr.co.kr/audition/?mode=list"
 VID_RE = re.compile(r"(?:[?&]|&amp;)vid=(\d+)")
+
+ZENROWS_ENDPOINT = "https://api.zenrows.com/v1/"
 
 
 @dataclass(frozen=True)
@@ -38,6 +45,26 @@ def _default_headers() -> dict:
 def _looks_like_bot_challenge(html: str) -> bool:
     lowered = html.lower()
     return "cupid.js" in lowered or "tonumbers" in lowered
+
+
+def _looks_forbidden(html: str) -> bool:
+    lowered = html.lower()
+    return "403 forbidden" in lowered or "you don't have permission" in lowered
+
+
+def _fetch_html_zenrows(api_key: str, timeout_seconds: int = 60) -> tuple[str, int, str]:
+    """ZenRows API 로 한국 IP + JS 렌더링 우회."""
+    params = {
+        "apikey": api_key,
+        "url": AUDITION_URL,
+        "js_render": "true",
+        "premium_proxy": "true",
+        "proxy_country": "kr",
+    }
+    api_url = ZENROWS_ENDPOINT + "?" + urlencode(params)
+    resp = requests.get(api_url, timeout=timeout_seconds)
+    resp.raise_for_status()
+    return resp.text, resp.status_code, AUDITION_URL
 
 
 def _fetch_html_requests(timeout_seconds: int = 20) -> tuple[str, int, str]:
@@ -101,7 +128,24 @@ def _parse_posts_from_html(html: str, *, status: int, source_url: str) -> List[P
 
 
 def fetch_posts(timeout_seconds: int = 20) -> List[Post]:
-    """OTR 오디션 목록 글들을 가져온다. requests 우선 시도, 봇 차단되면 Playwright 폴백."""
+    """OTR 오디션 목록 글들을 가져온다.
+
+    우선순위:
+    1. ZENROWS_API_KEY 가 있으면 ZenRows 로 한국 IP + JS 렌더링 (운영용)
+    2. 없으면 requests 직접 호출 (로컬에서 한국 IP 일 때만 작동)
+    3. requests 가 봇 차단 페이지를 받으면 Playwright 폴백 (로컬 디버깅용)
+    """
+    api_key = os.environ.get("ZENROWS_API_KEY", "").strip()
+
+    if api_key:
+        print("Fetching via ZenRows (proxy_country=kr, js_render=true)...")
+        html, status, source_url = _fetch_html_zenrows(api_key, timeout_seconds=60)
+        if _looks_forbidden(html) or _looks_like_bot_challenge(html):
+            print("ZenRows response still looks blocked. Will not retry locally on Actions.")
+        return _parse_posts_from_html(html, status=status, source_url=source_url)
+
+    # --- 로컬 개발 경로 ---
+    print("ZENROWS_API_KEY not set. Falling back to direct requests (local dev mode).")
     html, status, source_url = _fetch_html_requests(timeout_seconds=timeout_seconds)
 
     if _looks_like_bot_challenge(html):
