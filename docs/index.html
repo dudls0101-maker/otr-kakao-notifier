@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#8E44E0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="뮤지컬 오디션 보드">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+  <title>뮤지컬 오디션 보드</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-elev: #f6f5fa;
+      --text: #1a1a1f;
+      --text-secondary: #6b6b73;
+      --border: #e7e6ee;
+      --accent: #8E44E0;
+      --accent-bg: rgba(142, 68, 224, 0.12);
+      --danger: #d9534f;
+      --safe-top: env(safe-area-inset-top);
+      --safe-bottom: env(safe-area-inset-bottom);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e0d12;
+        --bg-elev: #1a1922;
+        --text: #f0eff5;
+        --text-secondary: #8a8995;
+        --border: #28272f;
+        --accent: #b388ff;
+        --accent-bg: rgba(179, 136, 255, 0.16);
+      }
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      min-height: 100vh;
+    }
+    header {
+      position: sticky;
+      top: var(--safe-top);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+    }
+    header h1 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 0;
+    }
+    #updated {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    main {
+      padding: 8px 0 24px;
+    }
+    .audition {
+      display: block;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .audition:active {
+      background: var(--bg-elev);
+    }
+    .audition .title {
+      font-size: 15px;
+      font-weight: 500;
+      margin: 0 0 8px;
+      color: var(--text);
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+    .audition .meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge::before {
+      content: "🎤";
+      font-size: 10px;
+    }
+    .seen {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    #state {
+      padding: 60px 24px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+    #state .icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+    #state h2 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 0 0 4px;
+      color: var(--text);
+    }
+    #state p {
+      font-size: 13px;
+      margin: 0 0 16px;
+    }
+    button.retry {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button.retry:active {
+      opacity: 0.7;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .refresh {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      padding: 0;
+    }
+    .refresh:active {
+      background: var(--bg-elev);
+    }
+    .refresh svg {
+      width: 18px;
+      height: 18px;
+      transition: transform 0.4s;
+    }
+    .refresh.spinning svg {
+      animation: spin 0.8s linear infinite;
+    }
+    .right-cluster {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>뮤지컬 오디션 보드</h1>
+    <div class="right-cluster">
+      <span id="updated"></span>
+      <button class="refresh" id="refresh-btn" aria-label="새로고침">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3"></path>
+          <path d="M21 21v-6h-6"></path>
+          <path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3"></path>
+          <path d="M3 3v6h6"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div id="state">
+      <div class="spinner"></div>
+      <p>불러오는 중…</p>
+    </div>
+    <div id="list" hidden></div>
+  </main>
+
+  <script>
+    // 같은 도메인의 docs/auditions.json 을 fetch.
+    // GitHub Actions 가 매일 docs/auditions.json 을 갱신/커밋한다.
+    const JSON_URL = './auditions.json';
+
+    const state = document.getElementById('state');
+    const list = document.getElementById('list');
+    const updated = document.getElementById('updated');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    function fmtUpdated(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      const m = d.getMonth() + 1, dd = d.getDate();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${m}월 ${dd}일 ${hh}:${mm} 기준`;
+    }
+
+    function fmtRelative(iso) {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      const diff = (Date.now() - d.getTime()) / 1000;
+      if (diff < 60) return '방금 전';
+      if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
+      if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}일 전`;
+      const m = d.getMonth() + 1, dd = d.getDate();
+      return `${m}/${dd}`;
+    }
+
+    function cleanTitle(t) {
+      return t.replace(/^\[?뮤지컬\]?\s*/, '').trim();
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+
+    function renderList(data) {
+      const items = data.auditions || [];
+      if (items.length === 0) {
+        showState({ icon: '📭', title: '아직 등록된 오디션이 없어요', message: '' });
+        return;
+      }
+      updated.textContent = fmtUpdated(data.updated_at);
+      list.innerHTML = items.map(a => `
+        <a class="audition" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">
+          <div class="title">${escapeHtml(cleanTitle(a.title))}</div>
+          <div class="meta">
+            <span class="badge">뮤지컬</span>
+            <span class="seen">${fmtRelative(a.first_seen_at)}</span>
+          </div>
+        </a>
+      `).join('');
+      state.hidden = true;
+      list.hidden = false;
+    }
+
+    function showState({ icon, title, message, retry = false }) {
+      list.hidden = true;
+      state.hidden = false;
+      state.innerHTML = `
+        <div class="icon">${icon}</div>
+        ${title ? `<h2>${escapeHtml(title)}</h2>` : ''}
+        ${message ? `<p>${escapeHtml(message)}</p>` : ''}
+        ${retry ? '<button class="retry" id="retry-btn">다시 시도</button>' : ''}
+      `;
+      if (retry) {
+        document.getElementById('retry-btn').addEventListener('click', load);
+      }
+    }
+
+    function showLoading() {
+      list.hidden = true;
+      state.hidden = false;
+      state.innerHTML = '<div class="spinner"></div><p>불러오는 중…</p>';
+    }
+
+    let isLoading = false;
+    async function load() {
+      if (isLoading) return;
+      isLoading = true;
+      refreshBtn.classList.add('spinning');
+      try {
+        // 캐시 우회: query 에 timestamp 추가
+        const res = await fetch(`${JSON_URL}?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderList(data);
+      } catch (err) {
+        console.error(err);
+        showState({
+          icon: '⚠️',
+          title: '불러오기 실패',
+          message: err.message || '네트워크 연결을 확인해주세요',
+          retry: true,
+        });
+      } finally {
+        isLoading = false;
+        refreshBtn.classList.remove('spinning');
+      }
+    }
+
+    refreshBtn.addEventListener('click', () => {
+      showLoading();
+      load();
+    });
+
+    // 첫 로드
+    load();
+
+    // PWA service worker (오프라인 캐싱)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      });
+    }
+
+    // 화면이 다시 활성화될 때 (앱 다시 켜기 등) 자동 새로고침
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        load();
+      }
+    });
+  </script>
+</body>
+</html>

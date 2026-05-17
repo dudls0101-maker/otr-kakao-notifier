@@ -3,14 +3,13 @@ name: Build Auditions JSON
 # OTR 오디션 사이트를 ZenRows 프록시 경유로 긁어 auditions.json 을 갱신/커밋한다.
 # iOS 앱은 이 JSON 을 fetch 해서 화면에 띄운다.
 #
-# 무료 ZenRows 1000 credits/월, 한국 premium proxy + JS = 약 25 credits/call.
-# 안전 마진 두고 하루 4회(=120/월) 정도로 운영.
+# 무료 ZenRows 1000 credits/월, 1회 호출당 ~30 credits 소모.
+# 따라서 하루 1회(=약 30회/월) 운영. 더 잦은 업데이트 원하면 유료 plan 또는 Oracle Cloud 로 이전.
 
 on:
   schedule:
-    # 매 6시간마다 (00:15, 06:15, 12:15, 18:15 UTC = 한국 09:15, 15:15, 21:15, 03:15)
-    # GitHub schedule cron 은 보통 5~15분 지연될 수 있어서 15분에 출발하도록 약간 오프셋.
-    - cron: '15 */6 * * *'
+    # 매일 한국 시간 20:00 (UTC 11:00) 1회. GitHub cron 은 5~15분 지연될 수 있다.
+    - cron: '0 11 * * *'
   workflow_dispatch:
 
 permissions:
@@ -45,9 +44,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add auditions.json
+          git add docs/auditions.json
           if git diff --cached --quiet; then
-            echo "No changes to auditions.json"
+            echo "No changes to docs/auditions.json"
             exit 0
           fi
           git commit -m "chore: update auditions.json"

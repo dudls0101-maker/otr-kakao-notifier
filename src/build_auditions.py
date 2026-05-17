@@ -14,7 +14,9 @@ from typing import Dict, List
 from .check_otr_audition import AUDITION_URL, Post, fetch_posts
 
 
-AUDITIONS_JSON = "auditions.json"
+# docs/ 안에 두면 GitHub Pages 가 같은 도메인에서 서빙해주므로
+# PWA 가 동일 origin 으로 fetch 할 수 있다 (CORS 문제 없음).
+AUDITIONS_JSON = "docs/auditions.json"
 KEYWORD = "뮤지컬"
 
 
