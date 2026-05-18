@@ -1,26 +1,34 @@
 """OTR 오디션 목록 크롤링 라이브러리.
 
-`fetch_posts()` 를 호출하면 OTR 오디션 게시판의 글 목록을 가져온다.
+Cloudflare Worker(otr-proxy)를 거쳐 OTR 게시판을 호출한다.
+OTR 이 cupid.js JavaScript 챌린지(AES-CBC 한 블록 암호화 토큰)를 응답하면
+파이썬에서 직접 복호화해 CUPID 쿠키를 만들고 ckattempt=1 으로 재요청한다.
 
-OTR 은 GitHub Actions 데이터센터 IP 를 봇으로 차단(cupid.js → 403)하므로,
-환경변수 `ZENROWS_API_KEY` 가 있으면 ZenRows 프록시(한국 IP + JS 렌더링)로
-우회한다. 키가 없으면 기존 requests / Playwright 경로로 시도(로컬 개발용).
+환경변수:
+- PROXY_URL: Cloudflare Worker URL (기본값: hard-coded fallback)
 """
 
 import os
 import re
+from binascii import hexlify, unhexlify
 from dataclasses import dataclass
-from typing import List
-from urllib.parse import urlencode
+from typing import List, Optional
 
 import requests
 from bs4 import BeautifulSoup
+from Crypto.Cipher import AES
 
 
+# Cloudflare Worker 기본 URL. GitHub Secrets 의 PROXY_URL 로 override 가능.
+DEFAULT_PROXY_URL = "https://otr-proxy.dudls010.workers.dev"
+
+# auditions.json 의 source 필드 등에 표시할 원본 URL (참조용)
 AUDITION_URL = "https://otr.co.kr/audition/?mode=list"
-VID_RE = re.compile(r"(?:[?&]|&amp;)vid=(\d+)")
 
-ZENROWS_ENDPOINT = "https://api.zenrows.com/v1/"
+VID_RE = re.compile(r"(?:[?&]|&amp;)vid=(\d+)")
+CUPID_A_RE = re.compile(r'a\s*=\s*toNumbers\("([0-9a-f]+)"\)')
+CUPID_B_RE = re.compile(r'b\s*=\s*toNumbers\("([0-9a-f]+)"\)')
+CUPID_C_RE = re.compile(r'c\s*=\s*toNumbers\("([0-9a-f]+)"\)')
 
 
 @dataclass(frozen=True)
@@ -30,71 +38,47 @@ class Post:
     url: str
 
 
+def _proxy_url() -> str:
+    return os.environ.get("PROXY_URL", DEFAULT_PROXY_URL).rstrip("/")
+
+
 def _default_headers() -> dict:
     return {
         "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/122.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.4 Safari/605.1.15"
         ),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.7,en;q=0.6",
     }
 
 
-def _looks_like_bot_challenge(html: str) -> bool:
+def _is_cupid_challenge(html: str) -> bool:
     lowered = html.lower()
-    return "cupid.js" in lowered or "tonumbers" in lowered
+    return "cupid.js" in lowered and "tonumbers" in lowered
 
 
-def _looks_forbidden(html: str) -> bool:
-    lowered = html.lower()
-    return "403 forbidden" in lowered or "you don't have permission" in lowered
+def _solve_cupid_challenge(html: str) -> Optional[str]:
+    """cupid.js 챌린지 페이지에서 a, b, c hex 값 파싱 후 AES-CBC 복호화 → CUPID 토큰(hex)."""
+    m_a = CUPID_A_RE.search(html)
+    m_b = CUPID_B_RE.search(html)
+    m_c = CUPID_C_RE.search(html)
+    if not (m_a and m_b and m_c):
+        return None
+
+    key = unhexlify(m_a.group(1))       # AES key (16 bytes)
+    iv = unhexlify(m_b.group(1))         # IV (16 bytes)
+    cipher = unhexlify(m_c.group(1))     # ciphertext (정확히 1 블록 = 16 bytes)
+
+    # slowAES 의 decrypt 는 padding 없는 raw 블록 복호화이므로
+    # pycryptodome AES.MODE_CBC.decrypt 를 그대로 쓰면 동일한 결과가 나온다.
+    aes = AES.new(key, AES.MODE_CBC, iv)
+    plaintext = aes.decrypt(cipher)
+    return hexlify(plaintext).decode("ascii")
 
 
-def _fetch_html_zenrows(api_key: str, timeout_seconds: int = 60) -> tuple[str, int, str]:
-    """ZenRows API 로 한국 IP + JS 렌더링 우회."""
-    params = {
-        "apikey": api_key,
-        "url": AUDITION_URL,
-        "js_render": "true",
-        "premium_proxy": "true",
-        "proxy_country": "kr",
-    }
-    api_url = ZENROWS_ENDPOINT + "?" + urlencode(params)
-    resp = requests.get(api_url, timeout=timeout_seconds)
-    resp.raise_for_status()
-    return resp.text, resp.status_code, AUDITION_URL
-
-
-def _fetch_html_requests(timeout_seconds: int = 20) -> tuple[str, int, str]:
-    resp = requests.get(AUDITION_URL, headers=_default_headers(), timeout=timeout_seconds)
-    resp.raise_for_status()
-    return resp.text, resp.status_code, resp.url
-
-
-def _fetch_html_playwright(timeout_seconds: int = 30) -> tuple[str, int, str]:
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent=_default_headers()["User-Agent"],
-            locale="ko-KR",
-        )
-        page = context.new_page()
-        page.set_default_timeout(timeout_seconds * 1000)
-        resp = page.goto(AUDITION_URL, wait_until="domcontentloaded")
-        page.wait_for_timeout(3000)
-        html = page.content()
-        status = resp.status if resp else 0
-        page_url = page.url
-        context.close()
-        browser.close()
-        return html, status, page_url
-
-
-def _parse_posts_from_html(html: str, *, status: int, source_url: str) -> List[Post]:
+def _parse_posts_from_html(html: str) -> List[Post]:
     soup = BeautifulSoup(html, "html.parser")
 
     posts: List[Post] = []
@@ -118,7 +102,7 @@ def _parse_posts_from_html(html: str, *, status: int, source_url: str) -> List[P
 
     if not posts:
         snippet = html.replace("\r", " ").replace("\n", " ")[:400]
-        print(f"No posts parsed. status={status} url={source_url} snippet={snippet}")
+        print(f"No posts parsed. snippet={snippet}")
 
     # dedupe by (vid, title)
     unique = {(p.vid, p.title): p for p in posts}
@@ -127,35 +111,43 @@ def _parse_posts_from_html(html: str, *, status: int, source_url: str) -> List[P
     return posts
 
 
-def fetch_posts(timeout_seconds: int = 20) -> List[Post]:
-    """OTR 오디션 목록 글들을 가져온다.
+def fetch_posts(timeout_seconds: int = 30) -> List[Post]:
+    """OTR 오디션 목록을 Cloudflare Worker 프록시 경유로 가져온다.
 
-    우선순위:
-    1. ZENROWS_API_KEY 가 있으면 ZenRows 로 한국 IP + JS 렌더링 (운영용)
-    2. 없으면 requests 직접 호출 (로컬에서 한국 IP 일 때만 작동)
-    3. requests 가 봇 차단 페이지를 받으면 Playwright 폴백 (로컬 디버깅용)
+    1) Worker URL 호출 → cupid 챌린지면 AES 복호화 → CUPID 토큰
+    2) CUPID 쿠키 + ckattempt=1 로 재요청 → 정상 HTML
+    3) HTML 파싱
     """
-    api_key = os.environ.get("ZENROWS_API_KEY", "").strip()
+    base = _proxy_url()
+    session = requests.Session()
+    session.headers.update(_default_headers())
 
-    if api_key:
-        print("Fetching via ZenRows (proxy_country=kr, js_render=true)...")
-        html, status, source_url = _fetch_html_zenrows(api_key, timeout_seconds=60)
-        if _looks_forbidden(html) or _looks_like_bot_challenge(html):
-            print("ZenRows response still looks blocked. Will not retry locally on Actions.")
-        return _parse_posts_from_html(html, status=status, source_url=source_url)
+    print(f"Fetching via Cloudflare Worker: {base}")
+    r1 = session.get(f"{base}/?mode=list", timeout=timeout_seconds)
+    html = r1.text
 
-    # --- 로컬 개발 경로 ---
-    print("ZENROWS_API_KEY not set. Falling back to direct requests (local dev mode).")
-    html, status, source_url = _fetch_html_requests(timeout_seconds=timeout_seconds)
+    if _is_cupid_challenge(html):
+        token = _solve_cupid_challenge(html)
+        if not token:
+            print("cupid challenge detected but could not parse a/b/c")
+            return []
+        print(f"cupid challenge solved, CUPID={token[:16]}...")
 
-    if _looks_like_bot_challenge(html):
-        print("Bot challenge detected (cupid.js). Falling back to Playwright...")
-        html, status, source_url = _fetch_html_playwright(timeout_seconds=30)
+        # 2차 호출: 쿠키 + ckattempt=1
+        r2 = session.get(
+            f"{base}/?mode=list&ckattempt=1",
+            headers={"Cookie": f"CUPID={token}"},
+            timeout=timeout_seconds,
+        )
+        html = r2.text
 
-    posts = _parse_posts_from_html(html, status=status, source_url=source_url)
-    if not posts and not _looks_like_bot_challenge(html):
-        print("No posts found via requests. Trying Playwright as a fallback...")
-        html2, status2, url2 = _fetch_html_playwright(timeout_seconds=30)
-        posts = _parse_posts_from_html(html2, status=status2, source_url=url2)
+        if _is_cupid_challenge(html):
+            print("still got cupid challenge after solving. abort.")
+            return []
 
-    return posts
+    if "403 forbidden" in html.lower():
+        snippet = html[:200].replace("\n", " ")
+        print(f"403 Forbidden. snippet={snippet}")
+        return []
+
+    return _parse_posts_from_html(html)

@@ -1,10 +1,10 @@
 name: Build Auditions JSON
 
-# OTR 오디션 사이트를 ZenRows 프록시 경유로 긁어 auditions.json 을 갱신/커밋한다.
-# iOS 앱은 이 JSON 을 fetch 해서 화면에 띄운다.
+# OTR 오디션 사이트를 Cloudflare Worker 프록시 경유로 긁어 docs/auditions.json 을 갱신/커밋한다.
+# PWA(GitHub Pages) 는 이 JSON 을 fetch 해서 화면에 띄운다.
 #
-# 무료 ZenRows 1000 credits/월, 1회 호출당 ~30 credits 소모.
-# 따라서 하루 1회(=약 30회/월) 운영. 더 잦은 업데이트 원하면 유료 plan 또는 Oracle Cloud 로 이전.
+# Cloudflare Workers 무료 plan: 10만 요청/일 — 우리는 하루 1번이라 사실상 무제한.
+# cupid.js 봇 챌린지는 Python 측에서 AES-CBC 복호화로 자동 해결.
 
 on:
   schedule:
@@ -37,7 +37,7 @@ jobs:
 
       - name: Scrape OTR and build auditions.json
         env:
-          ZENROWS_API_KEY: ${{ secrets.ZENROWS_API_KEY }}
+          PROXY_URL: ${{ secrets.PROXY_URL }}
         run: python -m src.build_auditions
 
       - name: Commit auditions.json
